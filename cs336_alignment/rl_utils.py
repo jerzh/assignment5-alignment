@@ -91,7 +91,7 @@ def compute_group_normalized_rewards(
         advantages = rewards
     # divide
     if advantage_normalizer == "std":
-        advantages /= torch.std(rewards, dim=1) + advantage_eps
+        advantages /= (torch.std(rewards, dim=1) + advantage_eps)
     elif advantage_normalizer == "mean":
         advantages /= group_mean + advantage_eps
     return advantages.flatten(), {}
@@ -105,7 +105,7 @@ def compute_policy_gradient_loss(
     cliprange: float | None = None,
     response_mask: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-    per_token_policy_gradient_loss = -raw_rewards_or_advantages * policy_log_probs
+    per_token_policy_gradient_loss = -raw_rewards_or_advantages.reshape(-1, 1) * policy_log_probs
     return per_token_policy_gradient_loss, {}
 
 
