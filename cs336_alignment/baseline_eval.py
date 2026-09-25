@@ -83,9 +83,9 @@ if __name__ == "__main__":
                 logging.info(completion[-args.completion_display_len//2:])
             rewards = reward_fn(completion, answer)
             logging.info(f"answer: {answer}")
-            logging.info(f"format_reward: {rewards['format_reward']}  answer_reward: {rewards['answer_reward']}\n")
+            logging.info(f"reward: {rewards['reward']}  format_reward: {rewards['format_reward']}\n")
             reward_total.update(rewards)
 
         logging.info("======================== FINAL RESULT ========================")
-        logging.info(f"format_reward: {reward_total['format_reward'] / len(test_data)}  answer_reward: {reward_total['answer_reward'] / len(test_data)}")
+        logging.info(f"reward: {reward_total['reward'] / len(test_data)}  format_reward: {reward_total['format_reward'] / len(test_data)}")
         logging.info("==============================================================\n")
