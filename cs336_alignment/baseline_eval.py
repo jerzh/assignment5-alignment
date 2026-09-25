@@ -19,6 +19,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--n-examples", type=int, default=10)
     p.add_argument("--seed", type=int, default=0)
 
+    # ---- logging parameters ----
+    p.add_argument("--completion-display-len", type=int, default=200)
+
     return p.parse_args()
 
 
@@ -72,9 +75,12 @@ if __name__ == "__main__":
         reward_total = collections.Counter()
         for qa_pair, completion in zip(test_data, completions):
             answer = qa_pair["answer"].split("####")[1].strip()
-            logging.info(f"completion: {completion}")
+            logging.info(f"completion: {completion[:args.completion_display_len]}")
             rewards = reward_fn(completion, answer)
             logging.info(f"format_reward: {rewards['format_reward']}  answer_reward: {rewards['answer_reward']}")
             reward_total.update(rewards)
 
+        logging.info("======================== FINAL RESULT ========================")
         logging.info(f"reward: {reward_total['format_reward'] / len(test_data)}  format_reward: {reward_total['format_reward'] / len(test_data)}")
+        logging.info("==============================================================")
+        logging.info()
