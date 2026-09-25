@@ -76,6 +76,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--wandb-project", type=str, default="cs336-assignment-5")
     p.add_argument("--run-name", type=str, default=None)
     p.add_argument("--rollout-display-len", type=int, default=2000)
+    p.add_argument("--debug-memory", action="store_true")
 
     return p.parse_args()
 
@@ -109,6 +110,7 @@ if __name__ == "__main__":
         args.resume_from or args.model_name,
         device="cuda:0",
     )
+    model.train()
     optimizer = AdamW(
         params=model.parameters(),
         lr=args.lr,
@@ -183,6 +185,10 @@ if __name__ == "__main__":
             normalization_constant=args.normalization_constant,
         )
 
+        if args.debug_memory:
+            logging.info(f"iter {i} peak {torch.cuda.max_memory_allocated(0)/2**30:.1f} GiB")
+            torch.cuda.reset_peak_memory_stats(0)
+
         if i % args.log_interval == 0:
             log_data = {
                 "train/loss": loss.item(),
@@ -205,7 +211,6 @@ if __name__ == "__main__":
 
         if i % args.eval_interval == 0:
             model.eval()
-            losses = []
             with open(args.prompt_path, "r") as f:
                 prompt = f.read()
             prompts = [prompt.format(question=obj["question"]) for obj in val_data]
