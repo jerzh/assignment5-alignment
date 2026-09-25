@@ -54,8 +54,11 @@ def get_response_log_probs(
     }
     if return_token_entropy:
         with torch.no_grad():
-            probs = softmax(logits, dim=2)
-            return_dict["token_entropy"] = -torch.sum(probs * log_probs, dim=-1)
+            lp = log_probs.detach()
+            # trick to reduce peak memory
+            return_dict["token_entropy"] = torch.stack(
+                [-(row.exp() * row).sum(dim=-1) for row in lp]
+            )
     return return_dict
 
 
