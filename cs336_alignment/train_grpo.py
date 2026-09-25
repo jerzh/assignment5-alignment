@@ -68,7 +68,8 @@ def parse_args() -> argparse.Namespace:
 
     # ---- eval / logging / checkpointing ----
     p.add_argument("--eval-interval", type=int, default=10)
-    p.add_argument("--log-interval", type=int, default=40)
+    p.add_argument("--log-interval", type=int, default=10)
+    p.add_argument("--log-rollout-interval", type=int, default=40)
     p.add_argument("--checkpoint-interval", type=int, default=100)
     p.add_argument("--checkpoint-dir", type=str, default="checkpoints")
     p.add_argument("--resume-from", type=str, default=None,
@@ -198,6 +199,10 @@ if __name__ == "__main__":
                 "train/format_reward": metadata["mean_format_reward"],
             }
             logging.info(f"iter: {i}  " + "  ".join(f"{k}: {v}" for k, v in log_data.items()))
+            if args.wandb_project is not None:
+                wandb.log(log_data, step=i)
+
+        if i % args.log_rollout_interval == 0:
             logging.info(f"sample prompt: {metadata['sample_prompt']}")
             rollout = metadata["sample_rollout"]
             if len(rollout) <= args.rollout_display_len:
@@ -206,8 +211,6 @@ if __name__ == "__main__":
                 logging.info(f"sample rollout: {rollout[:args.rollout_display_len//2]}")
                 logging.info(f"...")
                 logging.info(rollout[-args.rollout_display_len//2:])
-            if args.wandb_project is not None:
-                wandb.log(log_data, step=i)
 
         if i % args.eval_interval == 0:
             model.eval()
