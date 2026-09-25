@@ -160,7 +160,7 @@ def grpo_train_step(
         loss = aggregate_loss_across_microbatch(per_token_loss, tokenized["response_mask"], loss_normalization, normalization_constant) * len(_prompts) / len(repeated_prompts)
         loss.backward()
         # logging
-        batch_loss += loss.item()
+        batch_loss += loss
         metadatas.append(rewards_metadata | group_rewards_metadata | loss_metadata)
     clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
