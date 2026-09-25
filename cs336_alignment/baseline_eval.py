@@ -75,7 +75,12 @@ if __name__ == "__main__":
         reward_total = collections.Counter()
         for qa_pair, completion in zip(test_data, completions):
             answer = qa_pair["answer"].split("####")[1].strip()
-            logging.info(f"completion: {completion[:args.completion_display_len]}")
+            if len(completion) <= args.completion_display_len:
+                logging.info(f"completion: {completion}")
+            else:
+                logging.info(f"completion: {completion[:args.completion_display_len//2]}")
+                logging.info(f"...")
+                logging.info(completion[-args.completion_display_len//2:])
             rewards = reward_fn(completion, answer)
             logging.info(f"format_reward: {rewards['format_reward']}  answer_reward: {rewards['answer_reward']}")
             reward_total.update(rewards)
