@@ -156,19 +156,23 @@ def grpo_train_step(
         _responses = rollout_responses[i:i+microbatch_size]
         _advantages = advantages[i:i+microbatch_size]
         tokenized = tokenize_prompt_and_output(_prompts, _responses, tokenizer, model.device)
-        log_probs_dict = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"])
+        log_probs_dict = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"], return_token_entropy=True)
         per_token_loss, loss_metadata = compute_policy_gradient_loss(_advantages.to(model.device), log_probs_dict["log_probs"], importance_reweighting_method, old_log_probs, cliprange, tokenized["response_mask"])
         loss = aggregate_loss_across_microbatch(per_token_loss, tokenized["response_mask"], loss_normalization, normalization_constant) * len(_prompts) / len(repeated_prompts)
         loss.backward()
         # logging
-        batch_loss += loss
-        metadatas.append(rewards_metadata | group_rewards_metadata | loss_metadata)
-    clip_grad_norm_(model.parameters(), max_grad_norm)
+        batch_loss += loss.detach()
+        metadatas.append(rewards_metadata | group_rewards_metadata | loss_metadata | {
+            "mean_token_entropy": log_probs_dict["token_entropy"].mean()
+        })
+    grad_norm = clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
     optimizer.zero_grad()
     return batch_loss, {
         "sample_prompt": repeated_prompts[0],
         "sample_rollout": rollout_responses[0],
+        "grad_norm": grad_norm,
+        "mean_token_entropy": sum(m["mean_token_entropy"] for m in metadatas) / len(metadatas),
         "mean_reward": sum(m["mean_reward"] for m in metadatas) / len(metadatas),
         "mean_format_reward": sum(m["mean_format_reward"] for m in metadatas) / len(metadatas),
     }
