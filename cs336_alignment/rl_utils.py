@@ -53,8 +53,9 @@ def get_response_log_probs(
         "log_probs": torch.gather(log_probs, dim=-1, index=labels.unsqueeze(-1)).squeeze(-1),
     }
     if return_token_entropy:
-        probs = softmax(logits, dim=2)
-        return_dict["token_entropy"] = -torch.sum(probs * log_probs, dim=-1)
+        with torch.no_grad():
+            probs = softmax(logits, dim=2)
+            return_dict["token_entropy"] = -torch.sum(probs * log_probs, dim=-1)
     return return_dict
 
 
@@ -163,7 +164,8 @@ def grpo_train_step(
         # logging
         batch_loss += loss.detach()
         metadatas.append(rewards_metadata | group_rewards_metadata | loss_metadata | {
-            "mean_token_entropy": log_probs_dict["token_entropy"].mean()
+            # Only consider token entropy over response tokens
+            "mean_token_entropy": (log_probs_dict["token_entropy"] * tokenized["response_mask"]).sum().item() / tokenized["response_mask"].sum().item()
         })
     grad_norm = clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
@@ -171,7 +173,7 @@ def grpo_train_step(
     return batch_loss, {
         "sample_prompt": repeated_prompts[0],
         "sample_rollout": rollout_responses[0],
-        "grad_norm": grad_norm,
+        "grad_norm": grad_norm.item(),
         "mean_token_entropy": sum(m["mean_token_entropy"] for m in metadatas) / len(metadatas),
         "mean_reward": sum(m["mean_reward"] for m in metadatas) / len(metadatas),
         "mean_format_reward": sum(m["mean_format_reward"] for m in metadatas) / len(metadatas),
