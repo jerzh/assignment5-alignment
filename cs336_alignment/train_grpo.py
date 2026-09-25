@@ -68,7 +68,7 @@ def parse_args() -> argparse.Namespace:
     # ---- eval / logging / checkpointing ----
     p.add_argument("--eval-interval", type=int, default=10)
     p.add_argument("--log-interval", type=int, default=40)
-    p.add_argument("--checkpoint-interval", type=int, default=1600)
+    p.add_argument("--checkpoint-interval", type=int, default=100)
     p.add_argument("--checkpoint-dir", type=str, default="checkpoints")
     p.add_argument("--resume-from", type=str, default=None,
                    help="Path to checkpoint to resume training from.")
