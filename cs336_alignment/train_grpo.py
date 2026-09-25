@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
         if i % args.log_interval == 0:
             log_data = {
-                "train/loss": loss,
+                "train/loss": loss.item(),
                 "train/reward": metadata["mean_reward"],
                 "train/format_reward": metadata["mean_format_reward"],
             }
