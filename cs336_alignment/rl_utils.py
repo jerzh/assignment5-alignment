@@ -29,6 +29,9 @@ def tokenize_prompt_and_output(
     for i, (len_p, t) in enumerate(text_list):
         input_ids_full[i, :len(t)] = torch.tensor(t)
         response_mask_full[i, len_p:len(t)] = True
+    # Move to gpu after building inputs, slightly faster. Hardcoded to train gpu (0)
+    input_ids_full = input_ids_full.to("cuda:0")
+    response_mask_full = response_mask_full.to("cuda:0")
     return {
         "input_ids": input_ids_full[:, :-1],
         "labels": input_ids_full[:, 1:],
