@@ -46,6 +46,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--group-size", type=int, default=8)
     p.add_argument("--sampling-temperature", type=float, default=1.0)
     p.add_argument("--sampling-max-tokens", type=int, default=512)
+    p.add_argument("--vllm-gpu-util", type=int, default=0.9)
 
     # ---- GRPO loss / advantages ----
     p.add_argument("--baseline", type=str, choices=["mean", "none"], default="mean")
@@ -105,7 +106,7 @@ if __name__ == "__main__":
 
     model, tokenizer = get_model_and_tokenizer(
         args.resume_from or args.model_name,
-        device="cuda",
+        device="cuda:0",
     )
     optimizer = AdamW(
         params=model.parameters(),
@@ -117,6 +118,7 @@ if __name__ == "__main__":
         model_id="allenai/OLMo-2-0425-1B",
         seed=args.seed,
         gpu=1,
+        gpu_memory_utilization=args.vllm_gpu_util,
     )
     server.start()
     server.init_weight_sync("cuda:0")
