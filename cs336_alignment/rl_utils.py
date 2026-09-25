@@ -15,6 +15,7 @@ def tokenize_prompt_and_output(
     prompt_strs: list[str],
     output_strs: list[str],
     tokenizer: PreTrainedTokenizer,
+    device: str,
 ) -> dict[str, torch.Tensor]:
     text_list: list[tuple[int, list[int]]] = []
     # tokenize first to get max len
@@ -30,8 +31,8 @@ def tokenize_prompt_and_output(
         input_ids_full[i, :len(t)] = torch.tensor(t)
         response_mask_full[i, len_p:len(t)] = True
     # Move to gpu after building inputs, slightly faster. Hardcoded to train gpu (0)
-    input_ids_full = input_ids_full.to("cuda:0")
-    response_mask_full = response_mask_full.to("cuda:0")
+    input_ids_full = input_ids_full.to(device)
+    response_mask_full = response_mask_full.to(device)
     return {
         "input_ids": input_ids_full[:, :-1],
         "labels": input_ids_full[:, 1:],
@@ -152,11 +153,11 @@ def grpo_train_step(
         _prompts = repeated_prompts[i:i+microbatch_size]
         _responses = rollout_responses[i:i+microbatch_size]
         _truths = repeated_ground_truths[i:i+microbatch_size]
-        tokenized = tokenize_prompt_and_output(_prompts, _responses, tokenizer)
+        tokenized = tokenize_prompt_and_output(_prompts, _responses, tokenizer, model.device)
         log_probs_dict = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"])
         raw_rewards, rewards_metadata = compute_rollout_rewards(reward_fn, _responses, _truths)
         advantages, group_rewards_metadata = compute_group_normalized_rewards(raw_rewards, group_size, baseline, advantage_eps, advantage_normalizer)
-        per_token_loss, loss_metadata = compute_policy_gradient_loss(advantages, log_probs_dict["log_probs"], importance_reweighting_method, old_log_probs, cliprange, tokenized["response_mask"])
+        per_token_loss, loss_metadata = compute_policy_gradient_loss(advantages.to(model.device), log_probs_dict["log_probs"], importance_reweighting_method, old_log_probs, cliprange, tokenized["response_mask"])
         loss = aggregate_loss_across_microbatch(per_token_loss, tokenized["response_mask"], loss_normalization, normalization_constant) * len(_prompts) / len(repeated_prompts)
         loss.backward()
         # logging
