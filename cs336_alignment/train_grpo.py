@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--group-size", type=int, default=8)
     p.add_argument("--sampling-temperature", type=float, default=1.0)
     p.add_argument("--sampling-max-tokens", type=int, default=512)
-    p.add_argument("--vllm-gpu-util", type=int, default=0.9)
+    p.add_argument("--vllm-gpu-util", type=float, default=0.9)
 
     # ---- GRPO loss / advantages ----
     p.add_argument("--baseline", type=str, choices=["mean", "none"], default="mean")
@@ -115,7 +115,7 @@ if __name__ == "__main__":
         weight_decay=args.weight_decay,
     )
     server = VLLMServer(
-        model_id="allenai/OLMo-2-0425-1B",
+        model_id=args.model_name,
         seed=args.seed,
         gpu=1,
         gpu_memory_utilization=args.vllm_gpu_util,
