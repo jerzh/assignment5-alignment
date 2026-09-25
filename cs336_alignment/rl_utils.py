@@ -148,15 +148,16 @@ def grpo_train_step(
     microbatch_size = len(repeated_prompts) // gradient_accumulation_steps
     batch_loss = 0
     metadatas = []
+    # precompute advantages
+    raw_rewards, rewards_metadata = compute_rollout_rewards(reward_fn, rollout_responses, repeated_ground_truths)
+    advantages, group_rewards_metadata = compute_group_normalized_rewards(raw_rewards, group_size, baseline, advantage_eps, advantage_normalizer)
     for i in range(0, len(repeated_prompts), microbatch_size):
         _prompts = repeated_prompts[i:i+microbatch_size]
         _responses = rollout_responses[i:i+microbatch_size]
-        _truths = repeated_ground_truths[i:i+microbatch_size]
+        _advantages = advantages[i:i+microbatch_size]
         tokenized = tokenize_prompt_and_output(_prompts, _responses, tokenizer, model.device)
         log_probs_dict = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"])
-        raw_rewards, rewards_metadata = compute_rollout_rewards(reward_fn, _responses, _truths)
-        advantages, group_rewards_metadata = compute_group_normalized_rewards(raw_rewards, group_size, baseline, advantage_eps, advantage_normalizer)
-        per_token_loss, loss_metadata = compute_policy_gradient_loss(advantages.to(model.device), log_probs_dict["log_probs"], importance_reweighting_method, old_log_probs, cliprange, tokenized["response_mask"])
+        per_token_loss, loss_metadata = compute_policy_gradient_loss(_advantages.to(model.device), log_probs_dict["log_probs"], importance_reweighting_method, old_log_probs, cliprange, tokenized["response_mask"])
         loss = aggregate_loss_across_microbatch(per_token_loss, tokenized["response_mask"], loss_normalization, normalization_constant) * len(_prompts) / len(repeated_prompts)
         loss.backward()
         # logging
