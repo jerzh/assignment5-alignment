@@ -120,7 +120,7 @@ if __name__ == "__main__":
         seed=args.seed,
     )
     server.start()
-    server.init_weight_sync()
+    server.init_weight_sync(args.device)
     start_iter = 0
     if args.resume_from is not None:
         obj = torch.load(Path(args.resume_from) / "other_state.pt", weights_only=True)

@@ -39,7 +39,7 @@ if __name__ == "__main__":
         seed=args.seed,
     )
     server.start()
-    server.init_weight_sync()
+    server.init_weight_sync(args.device)
 
     for mode in ["question_only", "r1_zero", "r1_zero_three_shot"]:
         logging.info(f"begin eval for mode: {mode}")
