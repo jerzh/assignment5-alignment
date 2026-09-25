@@ -82,8 +82,8 @@ def compute_group_normalized_rewards(
     advantage_eps: float = 1e-6,
     advantage_normalizer: Literal["std", "none", "mean"] = "std",
 ):
-    rewards = raw_rewards.reshape(group_size, -1)
-    group_mean = rewards.mean(dim=1)
+    rewards = raw_rewards.reshape(-1, group_size)
+    group_mean = rewards.mean(dim=1, keepdim=True)
     # subtract
     if baseline == "mean":
         advantages = rewards - group_mean
@@ -91,7 +91,7 @@ def compute_group_normalized_rewards(
         advantages = rewards
     # divide
     if advantage_normalizer == "std":
-        advantages /= (torch.std(rewards, dim=1) + advantage_eps)
+        advantages /= torch.std(rewards, dim=1, keepdim=True) + advantage_eps
     elif advantage_normalizer == "mean":
         advantages /= group_mean + advantage_eps
     return advantages.flatten(), {}
@@ -145,7 +145,6 @@ def grpo_train_step(
     loss_normalization: Literal["sequence", "constant"] = "sequence",
     normalization_constant: int | None = None,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor | float]]:
-    optimizer.zero_grad()
     microbatch_size = len(repeated_prompts) // gradient_accumulation_steps
     batch_loss = 0
     metadatas = []
@@ -165,6 +164,7 @@ def grpo_train_step(
         metadatas.append(rewards_metadata | group_rewards_metadata | loss_metadata)
     clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
+    optimizer.zero_grad()
     return batch_loss, {
         "mean_reward": sum(m["mean_reward"] for m in metadatas) / len(metadatas),
         "mean_format_reward": sum(m["mean_format_reward"] for m in metadatas) / len(metadatas),
