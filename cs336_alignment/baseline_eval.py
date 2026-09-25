@@ -18,8 +18,6 @@ def parse_args() -> argparse.Namespace:
     # ---- benchmark parameters ----
     p.add_argument("--n-examples", type=int, default=10)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--device", type=str,
-                   default="cuda" if torch.cuda.is_available() else "cpu")
 
     return p.parse_args()
 
@@ -37,9 +35,10 @@ if __name__ == "__main__":
     server = VLLMServer(
         model_id="allenai/OLMo-2-0425-1B",
         seed=args.seed,
+        gpu=1,
     )
     server.start()
-    server.init_weight_sync(args.device)
+    server.init_weight_sync("cuda:0")
 
     for mode in ["question_only", "r1_zero", "r1_zero_three_shot"]:
         logging.info(f"begin eval for mode: {mode}")

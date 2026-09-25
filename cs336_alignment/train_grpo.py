@@ -63,8 +63,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--train-batch-size", type=int, default=256)
     p.add_argument("--gradient-accumulation-steps", type=int, default=32)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--device", type=str,
-                   default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--dtype", type=str, default="float32")
 
     # ---- eval / logging / checkpointing ----
@@ -107,7 +105,7 @@ if __name__ == "__main__":
 
     model, tokenizer = get_model_and_tokenizer(
         args.resume_from or args.model_name,
-        device=args.device,
+        device="cuda",
     )
     optimizer = AdamW(
         params=model.parameters(),
@@ -118,9 +116,10 @@ if __name__ == "__main__":
     server = VLLMServer(
         model_id="allenai/OLMo-2-0425-1B",
         seed=args.seed,
+        gpu=1,
     )
     server.start()
-    server.init_weight_sync(args.device)
+    server.init_weight_sync("cuda:0")
     start_iter = 0
     if args.resume_from is not None:
         obj = torch.load(Path(args.resume_from) / "other_state.pt", weights_only=True)
