@@ -82,5 +82,4 @@ if __name__ == "__main__":
 
         logging.info("======================== FINAL RESULT ========================")
         logging.info(f"reward: {reward_total['format_reward'] / len(test_data)}  format_reward: {reward_total['format_reward'] / len(test_data)}")
-        logging.info("==============================================================")
-        logging.info()
+        logging.info("==============================================================\n")
