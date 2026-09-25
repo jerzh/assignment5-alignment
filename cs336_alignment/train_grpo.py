@@ -75,6 +75,7 @@ def parse_args() -> argparse.Namespace:
                    help="Path to checkpoint to resume training from.")
     p.add_argument("--wandb-project", type=str, default="cs336-assignment-5")
     p.add_argument("--run-name", type=str, default=None)
+    p.add_argument("--rollout-display-len", type=int, default=200)
 
     return p.parse_args()
 
@@ -189,6 +190,14 @@ if __name__ == "__main__":
                 "train/format_reward": metadata["mean_format_reward"],
             }
             logging.info(f"iter: {i}  " + "  ".join(f"{k}: {v}" for k, v in log_data.items()))
+            logging.info(f"sample prompt: {metadata['sample_prompt']}")
+            sample_rollout = metadata["sample_rollout"]
+            if len(sample_rollout) <= args.rollout_display_len:
+                logging.info(f"sample rollout: {sample_rollout}")
+            else:
+                logging.info(f"sample rollout: {sample_rollout[:args.rollout_display_len//2]}")
+                logging.info(f"...")
+                logging.info(sample_rollout[-args.rollout_display_len//2:])
             if args.wandb_project is not None:
                 wandb.log(log_data, step=i)
 
@@ -203,11 +212,9 @@ if __name__ == "__main__":
                 sampling_params=val_sampling_params,
             )]
             reward_total = collections.Counter()
-            for qa_pair, completion in zip(val_data, rollout_responses):
+            for qa_pair, sample_rollout in zip(val_data, rollout_responses):
                 answer = qa_pair["answer"].split("####")[1].strip()
-                logging.info(f"completion: {completion}")
-                rewards = r1_zero_reward_fn(completion, answer)
-                logging.info(f"format_reward: {rewards['format_reward']}  answer_reward: {rewards['answer_reward']}")
+                rewards = r1_zero_reward_fn(sample_rollout, answer)
                 reward_total.update(rewards)
             mean_reward = reward_total['reward'] / len(val_data)
             mean_format_reward = reward_total['format_reward'] / len(val_data)

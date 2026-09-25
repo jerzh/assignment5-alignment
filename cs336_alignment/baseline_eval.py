@@ -9,7 +9,7 @@ import random
 import torch
 
 from cs336_alignment.drgrpo_grader import question_only_reward_fn, r1_zero_reward_fn
-from cs336_alignment.vllm_utils import VLLMServer, VLLMCompletion
+from cs336_alignment.vllm_utils import VLLMServer
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=0)
 
     # ---- logging parameters ----
-    p.add_argument("--completion-display-len", type=int, default=200)
+    p.add_argument("--rollout-display-len", type=int, default=200)
 
     return p.parse_args()
 
@@ -68,20 +68,20 @@ if __name__ == "__main__":
         with open(f"cs336_alignment/prompts/{prompt_file}.prompt", "r") as f:
             prompt = f.read()
         prompts = [prompt.format(question=obj["question"]) for obj in test_data]
-        completions = [c.text for c in server.generate_completions(
+        rollouts = [c.text for c in server.generate_completions(
             prompts=prompts,
             sampling_params=sampling_params,
         )]
         reward_total = collections.Counter()
-        for qa_pair, completion in zip(test_data, completions):
+        for qa_pair, rollout in zip(test_data, rollouts):
             answer = qa_pair["answer"].split("####")[1].strip()
-            if len(completion) <= args.completion_display_len:
-                logging.info(f"completion: {completion}")
+            if len(rollout) <= args.rollout_display_len:
+                logging.info(f"rollout: {rollout}")
             else:
-                logging.info(f"completion: {completion[:args.completion_display_len//2]}")
+                logging.info(f"rollout: {rollout[:args.rollout_display_len//2]}")
                 logging.info(f"...")
-                logging.info(completion[-args.completion_display_len//2:])
-            rewards = reward_fn(completion, answer)
+                logging.info(rollout[-args.rollout_display_len//2:])
+            rewards = reward_fn(rollout, answer)
             logging.info(f"answer: {answer}")
             logging.info(f"reward: {rewards['reward']}  format_reward: {rewards['format_reward']}\n")
             reward_total.update(rewards)

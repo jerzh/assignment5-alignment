@@ -167,6 +167,8 @@ def grpo_train_step(
     optimizer.step()
     optimizer.zero_grad()
     return batch_loss, {
+        "sample_prompt": repeated_prompts[0],
+        "sample_rollout": rollout_responses[0],
         "mean_reward": sum(m["mean_reward"] for m in metadatas) / len(metadatas),
         "mean_format_reward": sum(m["mean_format_reward"] for m in metadatas) / len(metadatas),
     }
