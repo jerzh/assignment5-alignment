@@ -87,5 +87,5 @@ if __name__ == "__main__":
             reward_total.update(rewards)
 
         logging.info("======================== FINAL RESULT ========================")
-        logging.info(f"reward: {reward_total['format_reward'] / len(test_data)}  format_reward: {reward_total['format_reward'] / len(test_data)}")
+        logging.info(f"format_reward: {reward_total['format_reward'] / len(test_data)}  answer_reward: {reward_total['answer_reward'] / len(test_data)}")
         logging.info("==============================================================\n")
