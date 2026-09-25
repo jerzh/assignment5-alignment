@@ -8,6 +8,7 @@ from torch import Tensor
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
 
+from cs336_alignment.rl_utils import *
 
 
 def run_tokenize_prompt_and_output(
@@ -46,7 +47,7 @@ def run_tokenize_prompt_and_output(
                 with labels, with value 1 where the corresponding label token
                 is part of the response and 0 otherwise.
     """
-    raise NotImplementedError
+    return tokenize_prompt_and_output(prompt_strs, output_strs, tokenizer)
 
 
 def run_get_response_log_probs(
@@ -82,7 +83,7 @@ def run_get_response_log_probs(
                 entropy for each position (present only if
                 return_token_entropy=True).
     """
-    raise NotImplementedError
+    return get_response_log_probs(model, input_ids, labels, return_token_entropy)
 
 
 def run_compute_rollout_rewards(
@@ -114,7 +115,7 @@ def run_compute_rollout_rewards(
                 Reward statistics to log. At minimum, include the mean total
                 and format rewards over the rollout batch.
     """
-    raise NotImplementedError
+    return compute_rollout_rewards(reward_fn, rollout_responses, repeated_ground_truths)
 
 
 def run_compute_group_normalized_rewards(
@@ -153,7 +154,7 @@ def run_compute_group_normalized_rewards(
                 your choice of other statistics to log (e.g. mean, std, max/min
                 of rewards).
     """
-    raise NotImplementedError
+    return compute_group_normalized_rewards(raw_rewards, group_size, baseline, advantage_eps, advantage_normalizer)
 
 
 def run_compute_policy_gradient_loss(
@@ -200,7 +201,7 @@ def run_compute_policy_gradient_loss(
                 Statistics from the underlying loss call, such as
                 clip-fraction components.
     """
-    raise NotImplementedError
+    return compute_policy_gradient_loss(raw_rewards_or_advantages, policy_log_probs, importance_reweighting_method, old_log_probs, cliprange, response_mask)
 
 
 def run_aggregate_loss_across_microbatch(
@@ -232,7 +233,7 @@ def run_aggregate_loss_across_microbatch(
             A scalar containing the average loss. Make sure you can later call
             backward on this loss.
     """
-    raise NotImplementedError
+    return aggregate_loss_across_microbatch(per_token_policy_gradient_loss, mask, loss_normalization, normalization_constant)
 
 
 def run_grpo_train_step(
@@ -325,7 +326,7 @@ def run_grpo_train_step(
 
 
 """
-The below adapters are used in the optional 
+The below adapters are used in the optional
 RLHF / safety part of the Alignment assignment.
 """
 
