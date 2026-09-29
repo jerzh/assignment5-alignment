@@ -123,7 +123,7 @@ def aggregate_loss_across_microbatch(
         per_seq_loss = torch.sum(per_token_policy_gradient_loss * mask, dim=1) / mask.sum(dim=1)
         return per_seq_loss.mean()
     else:
-        return per_token_policy_gradient_loss.mean() / normalization_constant
+        return (per_token_policy_gradient_loss * mask).sum() / normalization_constant
 
 
 def grpo_train_step(
@@ -155,6 +155,11 @@ def grpo_train_step(
     # precompute advantages
     raw_rewards, rewards_metadata = compute_rollout_rewards(reward_fn, rollout_responses, repeated_ground_truths)
     advantages, group_rewards_metadata = compute_group_normalized_rewards(raw_rewards, group_size, baseline, advantage_eps, advantage_normalizer)
+    # prune advantage == 0
+    adv_nonzero_idxs = advantages.nonzero(as_tuple=True)
+    repeated_prompts = repeated_prompts[adv_nonzero_idxs]
+    rollout_responses = rollout_responses[adv_nonzero_idxs]
+    advantages = advantages[adv_nonzero_idxs]
     for i in range(0, len(repeated_prompts), microbatch_size):
         _prompts = repeated_prompts[i:i+microbatch_size]
         _responses = rollout_responses[i:i+microbatch_size]
