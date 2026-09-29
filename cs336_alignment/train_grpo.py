@@ -15,7 +15,7 @@ import wandb
 
 from torch.optim import AdamW
 from cs336_alignment.checkpoint import get_model_and_tokenizer
-from cs336_alignment.drgrpo_grader import r1_zero_reward_fn
+from cs336_alignment.drgrpo_grader import question_only_reward_fn, r1_zero_reward_fn
 from cs336_alignment.rl_utils import grpo_train_step
 from cs336_alignment.vllm_utils import VLLMServer
 
@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--val-data", type=str, required=True)
     p.add_argument("--n-train-examples", type=int, default=6400)
     p.add_argument("--n-val-examples", type=int, default=1024)
-    p.add_argument("--prompt-path", type=str, default="cs336_alignment/prompts/r1_zero.prompt")
+    p.add_argument("--prompt", choices=["question_only", "r1_zero", "r1_zero_three_shot"], default="r1_zero")
 
     # ---- model / tokenizer ----
     p.add_argument("--model-name", type=str, default="allenai/OLMo-2-0425-1B")
@@ -148,12 +148,25 @@ if __name__ == "__main__":
         "stop": "</answer>",
         "include_stop_str_in_output": True,
     }
+    if args.prompt == "question_only":
+        prompt_path = "cs336_alignment/prompts/question_only.prompt"
+        reward_fn = question_only_reward_fn
+    elif args.prompt == "r1_zero":
+        prompt_path = "cs336_alignment/prompts/r1_zero.prompt"
+        reward_fn = r1_zero_reward_fn
+        sampling_params['stop'] = ["</answer>"]
+        sampling_params['include_stop_str_in_output'] = True
+    else:
+        prompt_path = "cs336_alignment/prompts/r1_zero_three_shot_gsm8k.prompt"
+        reward_fn = r1_zero_reward_fn
+        sampling_params['stop'] = ["</answer>"]
+        sampling_params['include_stop_str_in_output'] = True
 
     for i in range(start_iter + 1, args.num_rollout_steps + 1):
         server.sync_policy_weights(model)
 
         _train = random.sample(train_data, args.rollout_batch_size // args.group_size)
-        with open(args.prompt_path, "r") as f:
+        with open(prompt_path, "r") as f:
             prompt = f.read()
         prompts = [prompt.format(question=obj["question"]) for obj in _train]
         ground_truths = [obj["answer"].split("####")[1].strip() for obj in _train]
@@ -171,7 +184,7 @@ if __name__ == "__main__":
             optimizer=optimizer,
             gradient_accumulation_steps=args.gradient_accumulation_steps,
             max_grad_norm=args.max_grad_norm,
-            reward_fn=r1_zero_reward_fn,
+            reward_fn=reward_fn,
             repeated_prompts=repeated_prompts,
             rollout_responses=rollout_responses,
             repeated_ground_truths=repeated_ground_truths,
@@ -214,7 +227,7 @@ if __name__ == "__main__":
 
         if i % args.eval_interval == 0:
             model.eval()
-            with open(args.prompt_path, "r") as f:
+            with open(prompt_path, "r") as f:
                 prompt = f.read()
             prompts = [prompt.format(question=obj["question"]) for obj in val_data]
             rollout_responses = [c.text for c in server.generate_completions(
@@ -224,7 +237,7 @@ if __name__ == "__main__":
             reward_total = collections.Counter()
             for qa_pair, rollout in zip(val_data, rollout_responses):
                 answer = qa_pair["answer"].split("####")[1].strip()
-                rewards = r1_zero_reward_fn(rollout, answer)
+                rewards = reward_fn(rollout, answer)
                 reward_total.update(rewards | { "response_len": len(rollout) })
 
             log_data = {
