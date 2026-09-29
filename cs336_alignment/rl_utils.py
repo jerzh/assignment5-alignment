@@ -151,7 +151,7 @@ def grpo_train_step(
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor | float]]:
     n_total = len(repeated_prompts)
     microbatch_size = n_total // gradient_accumulation_steps
-    batch_loss = torch.tensor(0)
+    batch_loss = torch.tensor(0, device=model.device)
     metadatas = []
     # precompute advantages
     raw_rewards, rewards_metadata = compute_rollout_rewards(reward_fn, rollout_responses, repeated_ground_truths)
