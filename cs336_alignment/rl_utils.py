@@ -149,14 +149,15 @@ def grpo_train_step(
     loss_normalization: Literal["sequence", "constant"] = "sequence",
     normalization_constant: int | None = None,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor | float]]:
-    microbatch_size = len(repeated_prompts) // gradient_accumulation_steps
+    n_total = len(repeated_prompts)
+    microbatch_size = n_total // gradient_accumulation_steps
     batch_loss = 0
     metadatas = []
     # precompute advantages
     raw_rewards, rewards_metadata = compute_rollout_rewards(reward_fn, rollout_responses, repeated_ground_truths)
     advantages, group_rewards_metadata = compute_group_normalized_rewards(raw_rewards, group_size, baseline, advantage_eps, advantage_normalizer)
+    metadatas.append(rewards_metadata | group_rewards_metadata)
     # prune advantage == 0
-    n_total = len(repeated_prompts)
     adv_nonzero_idxs = advantages.nonzero(as_tuple=True)[0].tolist()
     repeated_prompts = [repeated_prompts[i] for i in adv_nonzero_idxs]
     rollout_responses = [rollout_responses[i] for i in adv_nonzero_idxs]
@@ -168,22 +169,33 @@ def grpo_train_step(
         tokenized = tokenize_prompt_and_output(_prompts, _responses, tokenizer, model.device)
         log_probs_dict = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"], return_token_entropy=True)
         per_token_loss, loss_metadata = compute_policy_gradient_loss(_advantages.to(model.device), log_probs_dict["log_probs"], importance_reweighting_method, old_log_probs, cliprange, tokenized["response_mask"])
-        loss = aggregate_loss_across_microbatch(per_token_loss, tokenized["response_mask"], loss_normalization, normalization_constant) * len(_prompts) / n_total
+        loss = aggregate_loss_across_microbatch(per_token_loss, tokenized["response_mask"], loss_normalization, normalization_constant)
+        if loss_normalization == "sequence":
+            loss *= len(_prompts) / n_total
         loss.backward()
         # logging
         batch_loss += loss.detach()
-        metadatas.append(rewards_metadata | group_rewards_metadata | loss_metadata | {
+        metadatas.append(loss_metadata | {
             # Only consider token entropy over response tokens
             "mean_token_entropy": (log_probs_dict["token_entropy"] * tokenized["response_mask"]).sum().item() / tokenized["response_mask"].sum().item()
         })
     grad_norm = clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
     optimizer.zero_grad()
+    if metadatas:
+        return batch_loss, {
+            "sample_prompt": repeated_prompts[0],
+            "sample_rollout": rollout_responses[0],
+            "grad_norm": grad_norm.item(),
+            "mean_token_entropy": sum(m["mean_token_entropy"] for m in metadatas) / len(metadatas),
+            "mean_reward": sum(m["mean_reward"] for m in metadatas) / len(metadatas),
+            "mean_format_reward": sum(m["mean_format_reward"] for m in metadatas) / len(metadatas),
+        }
     return batch_loss, {
-        "sample_prompt": repeated_prompts[0],
-        "sample_rollout": rollout_responses[0],
+        "sample_prompt": None,
+        "sample_rollout": None,
         "grad_norm": grad_norm.item(),
-        "mean_token_entropy": sum(m["mean_token_entropy"] for m in metadatas) / len(metadatas),
-        "mean_reward": sum(m["mean_reward"] for m in metadatas) / len(metadatas),
-        "mean_format_reward": sum(m["mean_format_reward"] for m in metadatas) / len(metadatas),
+        "mean_token_entropy": None,
+        "mean_reward": None,
+        "mean_format_reward": None,
     }
