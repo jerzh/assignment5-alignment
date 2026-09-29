@@ -45,8 +45,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--rollout-batch-size", type=int, default=256)
     p.add_argument("--group-size", type=int, default=8)
     p.add_argument("--sampling-temperature", type=float, default=1.0)
-    p.add_argument("--sampling-max-tokens", type=int, default=512)
-    p.add_argument("--vllm-gpu-util", type=float, default=0.9)
+    p.add_argument("--sampling-max-tokens", type=int, default=300)
+    p.add_argument("--vllm-gpu-util", type=float, default=0.7)
 
     # ---- GRPO loss / advantages ----
     p.add_argument("--baseline", type=str, choices=["mean", "none"], default="mean")
@@ -62,7 +62,7 @@ def parse_args() -> argparse.Namespace:
 
     # ---- training loop ----
     p.add_argument("--train-batch-size", type=int, default=256)
-    p.add_argument("--gradient-accumulation-steps", type=int, default=32)
+    p.add_argument("--gradient-accumulation-steps", type=int, default=64)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--dtype", type=str, default="float32")
 
