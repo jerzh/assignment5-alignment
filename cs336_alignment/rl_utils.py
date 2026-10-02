@@ -186,7 +186,9 @@ def grpo_train_step(
         _prompts = repeated_prompts[i:i+microbatch_size]
         _responses = rollout_responses[i:i+microbatch_size]
         _advantages = advantages[i:i+microbatch_size]
-        _old_log_probs = old_log_probs[i:i+microbatch_size]
+        _old_log_probs = None
+        if importance_reweighting_method != "none":
+            _old_log_probs = old_log_probs[i:i+microbatch_size]
         tokenized = tokenize_prompt_and_output(_prompts, _responses, tokenizer, model.device)
         log_probs_dict = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"], return_token_entropy=True)
         per_token_loss, loss_metadata = compute_policy_gradient_loss(_advantages.to(model.device), log_probs_dict["log_probs"], importance_reweighting_method, _old_log_probs, cliprange, tokenized["response_mask"])
