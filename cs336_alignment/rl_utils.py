@@ -47,7 +47,7 @@ def get_response_log_probs(
     return_token_entropy: bool = False,
 ) -> dict[str, torch.Tensor]:
     logits = model(input_ids).logits
-    # outputs = (batch, seq_len, vocab_size)
+    # logits = (batch, seq_len, vocab_size)
     log_probs = log_softmax(logits, dim=-1)
     return_dict = {
         "log_probs": torch.gather(log_probs, dim=-1, index=labels.unsqueeze(-1)).squeeze(-1),
@@ -109,7 +109,25 @@ def compute_policy_gradient_loss(
     cliprange: float | None = None,
     response_mask: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-    per_token_policy_gradient_loss = -raw_rewards_or_advantages.reshape(-1, 1) * policy_log_probs
+    adv = raw_rewards_or_advantages.reshape(-1, 1)
+    # ensure old_log_probs is the right shape; dim 1 = max len of rollout, not train batch
+    old_log_probs = old_log_probs[:, :policy_log_probs.shape[1]]
+    if importance_reweighting_method == "none":
+        per_token_policy_gradient_loss = -adv * policy_log_probs
+    elif importance_reweighting_method == "noclip":
+        per_token_policy_gradient_loss = -adv * (policy_log_probs / old_log_probs)
+    elif importance_reweighting_method == "grpo":
+        per_token_policy_gradient_loss = -torch.min(
+            adv * (policy_log_probs / old_log_probs),
+            adv * torch.clip(policy_log_probs / old_log_probs, 1-cliprange, 1+cliprange),
+        )
+    elif importance_reweighting_method == "gspo":
+        weight = torch.exp(torch.sum(policy_log_probs / old_log_probs * response_mask, dim=1) / response_mask.sum(dim=1))
+        per_token_policy_gradient_loss = -torch.min(
+            adv * weight,
+            adv * torch.clip(weight, 1-cliprange, 1+cliprange),
+        )
+    # log pre-clip weight magnitudes?
     return per_token_policy_gradient_loss, {}
 
 

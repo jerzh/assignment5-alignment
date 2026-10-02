@@ -16,7 +16,7 @@ import wandb
 from torch.optim import AdamW
 from cs336_alignment.checkpoint import get_model_and_tokenizer
 from cs336_alignment.drgrpo_grader import question_only_reward_fn, r1_zero_reward_fn
-from cs336_alignment.rl_utils import grpo_train_step
+from cs336_alignment.rl_utils import grpo_train_step, tokenize_prompt_and_output, get_response_log_probs
 from cs336_alignment.vllm_utils import VLLMServer
 
 
@@ -170,34 +170,39 @@ if __name__ == "__main__":
             prompt = f.read()
         prompts = [prompt.format(question=obj["question"]) for obj in _train]
         ground_truths = [obj["answer"].split("####")[1].strip() for obj in _train]
-        rollout_responses = [c.text for c in server.generate_completions(
+        rollout_full = server.generate_completions(
             prompts=prompts,
             sampling_params=sampling_params,
-        )]
+        )
+        rollout_responses = [c.text for c in rollout_full]
         repeated_prompts = list(chain.from_iterable(repeat(x, args.group_size) for x in prompts))
         repeated_ground_truths = list(chain.from_iterable(repeat(x, args.group_size) for x in ground_truths))
-        # note: args.train_batch_size not used currently
+        old_log_probs = None
+        if args.importance_reweighting_method != "none":
+            tokenized = tokenize_prompt_and_output(repeated_prompts, rollout_responses, tokenizer, model.device)
+            old_log_probs = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"], return_token_entropy=False)["log_probs"]
 
-        loss, metadata = grpo_train_step(
-            model=model,
-            tokenizer=tokenizer,
-            optimizer=optimizer,
-            gradient_accumulation_steps=args.gradient_accumulation_steps,
-            max_grad_norm=args.max_grad_norm,
-            reward_fn=reward_fn,
-            repeated_prompts=repeated_prompts,
-            rollout_responses=rollout_responses,
-            repeated_ground_truths=repeated_ground_truths,
-            group_size=args.group_size,
-            baseline=args.baseline,
-            advantage_eps=args.advantage_eps,
-            advantage_normalizer=args.advantage_normalizer,
-            importance_reweighting_method=args.importance_reweighting_method,
-            old_log_probs=None,  # fix later
-            cliprange=args.cliprange,
-            loss_normalization=args.loss_normalization,
-            normalization_constant=args.normalization_constant,
-        )
+        for j in range(0, args.rollout_batch_size, args.train_batch_size):
+            loss, metadata = grpo_train_step(
+                model=model,
+                tokenizer=tokenizer,
+                optimizer=optimizer,
+                gradient_accumulation_steps=args.gradient_accumulation_steps,
+                max_grad_norm=args.max_grad_norm,
+                reward_fn=reward_fn,
+                repeated_prompts=repeated_prompts[j:j+args.train_batch_size],
+                rollout_responses=rollout_responses[j:j+args.train_batch_size],
+                repeated_ground_truths=repeated_ground_truths[j:j+args.train_batch_size],
+                group_size=args.group_size,
+                baseline=args.baseline,
+                advantage_eps=args.advantage_eps,
+                advantage_normalizer=args.advantage_normalizer,
+                importance_reweighting_method=args.importance_reweighting_method,
+                old_log_probs=old_log_probs[j:j+args.train_batch_size],
+                cliprange=args.cliprange,
+                loss_normalization=args.loss_normalization,
+                normalization_constant=args.normalization_constant,
+            )
 
         if args.debug_memory:
             logging.info(f"iter {i} peak {torch.cuda.max_memory_allocated(0)/2**30:.1f} GiB")
