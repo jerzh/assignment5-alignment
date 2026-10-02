@@ -179,11 +179,14 @@ if __name__ == "__main__":
         repeated_ground_truths = list(chain.from_iterable(repeat(x, args.group_size) for x in ground_truths))
         old_log_probs = None
         if args.importance_reweighting_method != "none":
-            tokenized = tokenize_prompt_and_output(repeated_prompts, rollout_responses, tokenizer, model.device)
-            old_log_probs = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"], return_token_entropy=False)["log_probs"]
+            with torch.no_grad():
+                tokenized = tokenize_prompt_and_output(repeated_prompts, rollout_responses, tokenizer, model.device)
+                old_log_probs = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"], return_token_entropy=False)["log_probs"]
 
         for j in range(0, args.rollout_batch_size, args.train_batch_size):
-            _old_log_probs = old_log_probs[j:j+args.train_batch_size] if old_log_probs else None
+            _old_log_probs = None
+            if args.importance_reweighting_method != "none":
+                _old_log_probs = old_log_probs[j:j+args.train_batch_size]
             loss, metadata = grpo_train_step(
                 model=model,
                 tokenizer=tokenizer,
