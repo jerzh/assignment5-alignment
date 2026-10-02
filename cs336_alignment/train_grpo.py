@@ -170,18 +170,24 @@ if __name__ == "__main__":
             prompt = f.read()
         prompts = [prompt.format(question=obj["question"]) for obj in _train]
         ground_truths = [obj["answer"].split("####")[1].strip() for obj in _train]
-        rollout_full = server.generate_completions(
+        rollout_responses = [c.text for c in server.generate_completions(
             prompts=prompts,
             sampling_params=sampling_params,
-        )
-        rollout_responses = [c.text for c in rollout_full]
+        )]
         repeated_prompts = list(chain.from_iterable(repeat(x, args.group_size) for x in prompts))
         repeated_ground_truths = list(chain.from_iterable(repeat(x, args.group_size) for x in ground_truths))
         old_log_probs = None
         if args.importance_reweighting_method != "none":
+            tokenized = tokenize_prompt_and_output(repeated_prompts, rollout_responses, tokenizer, model.device)
             with torch.no_grad():
-                tokenized = tokenize_prompt_and_output(repeated_prompts, rollout_responses, tokenizer, model.device)
-                old_log_probs = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"], return_token_entropy=False)["log_probs"]
+                # unfortunately have to batch bc not enough RAM
+                old_list = []
+                for j in range(0, args.rollout_batch_size, args.train_batch_size):
+                    _inputs = tokenized["input_ids"][j:j+args.train_batch_size]
+                    _labels = tokenized["labels"][j:j+args.train_batch_size]
+                    _old = get_response_log_probs(model, _inputs, _labels)["log_probs"]
+                    old_list.append(_old)
+                old_log_probs = torch.cat(old_list, dim=0)
 
         for j in range(0, args.rollout_batch_size, args.train_batch_size):
             loss, metadata = grpo_train_step(
