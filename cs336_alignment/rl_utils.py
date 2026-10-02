@@ -111,7 +111,8 @@ def compute_policy_gradient_loss(
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     adv = raw_rewards_or_advantages.reshape(-1, 1)
     # ensure old_log_probs is the right shape; dim 1 = max len of rollout, not train batch
-    old_log_probs = old_log_probs[:, :policy_log_probs.shape[1]]
+    if old_log_probs:
+        old_log_probs = old_log_probs[:, :policy_log_probs.shape[1]]
     if importance_reweighting_method == "none":
         per_token_policy_gradient_loss = -adv * policy_log_probs
     elif importance_reweighting_method == "noclip":
