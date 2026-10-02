@@ -183,6 +183,7 @@ if __name__ == "__main__":
             old_log_probs = get_response_log_probs(model, tokenized["input_ids"], tokenized["labels"], return_token_entropy=False)["log_probs"]
 
         for j in range(0, args.rollout_batch_size, args.train_batch_size):
+            _old_log_probs = old_log_probs[j:j+args.train_batch_size] if old_log_probs else None
             loss, metadata = grpo_train_step(
                 model=model,
                 tokenizer=tokenizer,
@@ -198,7 +199,7 @@ if __name__ == "__main__":
                 advantage_eps=args.advantage_eps,
                 advantage_normalizer=args.advantage_normalizer,
                 importance_reweighting_method=args.importance_reweighting_method,
-                old_log_probs=old_log_probs[j:j+args.train_batch_size],
+                old_log_probs=_old_log_probs,
                 cliprange=args.cliprange,
                 loss_normalization=args.loss_normalization,
                 normalization_constant=args.normalization_constant,
