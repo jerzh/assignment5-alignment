@@ -225,14 +225,17 @@ if __name__ == "__main__":
                 wandb.log(log_data, step=i)
 
         if i % args.log_rollout_interval == 0:
-            logging.info(f"sample prompt: {metadata['sample_prompt']}")
-            rollout = metadata["sample_rollout"]
-            if len(rollout) <= args.rollout_display_len:
-                logging.info(f"sample rollout: {rollout}")
+            if metadata["sample_prompt"] is None:
+                logging.info("No sample prompt/rollout, batch is empty")
             else:
-                logging.info(f"sample rollout: {rollout[:args.rollout_display_len//2]}")
-                logging.info(f"...")
-                logging.info(rollout[-args.rollout_display_len//2:])
+                logging.info(f"sample prompt: {metadata['sample_prompt']}")
+                rollout = metadata["sample_rollout"]
+                if len(rollout) <= args.rollout_display_len:
+                    logging.info(f"sample rollout: {rollout}")
+                else:
+                    logging.info(f"sample rollout: {rollout[:args.rollout_display_len//2]}")
+                    logging.info(f"...")
+                    logging.info(rollout[-args.rollout_display_len//2:])
 
         if i % args.eval_interval == 0:
             model.eval()
