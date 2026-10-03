@@ -74,8 +74,8 @@ def compute_rollout_rewards(
         raw_rewards.append(reward_dict["reward"])
         total_rewards.update(reward_dict)
     return torch.tensor(raw_rewards), {
-        "mean_reward": total_rewards["reward"] / len(rollout_responses),
-        "mean_format_reward": total_rewards["format_reward"] / len(rollout_responses),
+        "reward": total_rewards["reward"] / len(rollout_responses),
+        "format_reward": total_rewards["format_reward"] / len(rollout_responses),
     }
 
 
@@ -118,6 +118,8 @@ def compute_policy_gradient_loss(
     # ensure old_log_probs is the right shape; dim 1 = max len of rollout, not train batch
     old_log_probs = old_log_probs[:, :policy_log_probs.shape[1]]
     token_weight = torch.exp(policy_log_probs - old_log_probs)
+    with torch.no_grad():
+        approx_kl = torch.sum(((token_weight - 1) - token_weight.log()) * response_mask, dim=1) / response_mask.sum(dim=1)
     if importance_reweighting_method == "noclip":
         per_token_policy_gradient_loss = -adv * token_weight
         is_clipped = None
@@ -126,16 +128,20 @@ def compute_policy_gradient_loss(
             adv * token_weight,
             adv * torch.clip(token_weight, 1-cliprange, 1+cliprange),
         )
-        is_clipped = adv * token_weight < adv * torch.clip(token_weight, 1-cliprange, 1+cliprange)
+        with torch.no_grad():
+            is_clipped = adv * token_weight > adv * torch.clip(token_weight, 1-cliprange, 1+cliprange)
     elif importance_reweighting_method == "gspo":
         gspo_weight = torch.exp(torch.sum((policy_log_probs - old_log_probs) * response_mask, dim=1) / response_mask.sum(dim=1)).unsqueeze(1).expand(policy_log_probs.shape)
         per_token_policy_gradient_loss = -torch.min(
             adv * gspo_weight,
             adv * torch.clip(gspo_weight, 1-cliprange, 1+cliprange),
         )
-        is_clipped = adv * gspo_weight < adv * torch.clip(gspo_weight, 1-cliprange, 1+cliprange)
+        with torch.no_grad():
+            is_clipped = adv * gspo_weight > adv * torch.clip(gspo_weight, 1-cliprange, 1+cliprange)
     return per_token_policy_gradient_loss, {
-        "clip_fraction": is_clipped.mean() if is_clipped is not None else None
+        # mean over sequence-level clip fraction
+        "clip_fraction": torch.mean(torch.sum(is_clipped * response_mask, dim=1) / response_mask.sum(dim=1)) if is_clipped is not None else None,
+        "approx_kl": approx_kl.mean(),
     }
 
 
@@ -214,12 +220,14 @@ def grpo_train_step(
     grad_norm = clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
     optimizer.zero_grad()
+    mean_ = lambda s: sum(m[s] for m in metadatas) / len(metadatas) if metadatas else None
     return batch_loss, {
         "sample_prompt": samples["sample_prompt"],
         "sample_rollout": samples["sample_rollout"],
         "grad_norm": grad_norm.item(),
-        "mean_token_entropy": sum(m["mean_token_entropy"] for m in metadatas) / len(metadatas) if metadatas else None,
-        "mean_clip_fraction": sum(m["clip_fraction"] for m in metadatas) / len(metadatas) if metadatas else None,
-        "mean_reward": rewards_metadata["mean_reward"],
-        "mean_format_reward": rewards_metadata["mean_format_reward"],
+        "token_entropy": mean_("token_entropy"),
+        "clip_fraction": mean_("clip_fraction"),
+        "approx_kl": mean_("approx_kl"),
+        "reward": rewards_metadata["reward"],
+        "format_reward": rewards_metadata["format_reward"],
     }

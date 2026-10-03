@@ -217,10 +217,11 @@ if __name__ == "__main__":
             log_data = {
                 "train/loss": loss.item(),
                 "train/grad_norm": metadata["grad_norm"],
-                "train/token_entropy": metadata["mean_token_entropy"],
-                "train/clip_fraction": metadata["mean_clip_fraction"],
-                "train/reward": metadata["mean_reward"],
-                "train/format_reward": metadata["mean_format_reward"],
+                "train/token_entropy": metadata["token_entropy"],
+                "train/clip_fraction": metadata["clip_fraction"],
+                "train/approx_kl": metadata["approx_kl"],
+                "train/reward": metadata["reward"],
+                "train/format_reward": metadata["format_reward"],
             }
             logging.info(f"iter: {i}  " + "  ".join(f"{k}: {v}" for k, v in log_data.items()))
             if args.wandb_project is not None:
