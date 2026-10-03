@@ -218,6 +218,7 @@ if __name__ == "__main__":
                 "train/loss": loss.item(),
                 "train/grad_norm": metadata["grad_norm"],
                 "train/token_entropy": metadata["mean_token_entropy"],
+                "train/clip_fraction": metadata["mean_clip_fraction"],
                 "train/reward": metadata["mean_reward"],
                 "train/format_reward": metadata["mean_format_reward"],
             }

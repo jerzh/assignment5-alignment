@@ -120,18 +120,23 @@ def compute_policy_gradient_loss(
     token_weight = torch.exp(policy_log_probs - old_log_probs)
     if importance_reweighting_method == "noclip":
         per_token_policy_gradient_loss = -adv * token_weight
+        is_clipped = None
     elif importance_reweighting_method == "grpo":
         per_token_policy_gradient_loss = -torch.min(
             adv * token_weight,
             adv * torch.clip(token_weight, 1-cliprange, 1+cliprange),
         )
+        is_clipped = adv * token_weight < adv * torch.clip(token_weight, 1-cliprange, 1+cliprange)
     elif importance_reweighting_method == "gspo":
         gspo_weight = torch.exp(torch.sum((policy_log_probs - old_log_probs) * response_mask, dim=1) / response_mask.sum(dim=1)).unsqueeze(1).expand(policy_log_probs.shape)
         per_token_policy_gradient_loss = -torch.min(
             adv * gspo_weight,
             adv * torch.clip(gspo_weight, 1-cliprange, 1+cliprange),
         )
-    return per_token_policy_gradient_loss, {}
+        is_clipped = adv * gspo_weight < adv * torch.clip(gspo_weight, 1-cliprange, 1+cliprange)
+    return per_token_policy_gradient_loss, {
+        "clip_fraction": is_clipped.mean() if is_clipped is not None else None
+    }
 
 
 def aggregate_loss_across_microbatch(
@@ -204,7 +209,7 @@ def grpo_train_step(
         batch_loss += loss.detach()
         metadatas.append(loss_metadata | {
             # Only consider token entropy over response tokens
-            "mean_token_entropy": (log_probs_dict["token_entropy"] * tokenized["response_mask"]).sum().item() / tokenized["response_mask"].sum().item()
+            "mean_token_entropy": (log_probs_dict["token_entropy"] * tokenized["response_mask"]).sum().item() / tokenized["response_mask"].sum().item(),
         })
     grad_norm = clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
@@ -214,6 +219,7 @@ def grpo_train_step(
         "sample_rollout": samples["sample_rollout"],
         "grad_norm": grad_norm.item(),
         "mean_token_entropy": sum(m["mean_token_entropy"] for m in metadatas) / len(metadatas) if metadatas else None,
+        "mean_clip_fraction": sum(m["clip_fraction"] for m in metadatas) / len(metadatas) if metadatas else None,
         "mean_reward": rewards_metadata["mean_reward"],
         "mean_format_reward": rewards_metadata["mean_format_reward"],
     }
