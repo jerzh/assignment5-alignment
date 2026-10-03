@@ -64,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--train-batch-size", type=int, default=256)
     p.add_argument("--gradient-accumulation-steps", type=int, default=64)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--dtype", type=str, default="float32")
+    p.add_argument("--grad-checkpointing", action="store_true")
 
     # ---- eval / logging / checkpointing ----
     p.add_argument("--eval-interval", type=int, default=10)
@@ -84,10 +84,6 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.dtype == "float32":
-        dtype = torch.float32
-    else:
-        raise ValueError("Only f32 supported")
     if args.rollout_batch_size % args.group_size != 0:
         raise ValueError("Group size does not divide rollout batch size")
 
@@ -112,6 +108,8 @@ if __name__ == "__main__":
         device="cuda:0",
     )
     model.train()
+    if args.grad_checkpointing:
+        model.gradient_checkpointing_enable()
     optimizer = AdamW(
         params=model.parameters(),
         lr=args.lr,

@@ -177,6 +177,11 @@ def grpo_train_step(
     # precompute advantages
     raw_rewards, rewards_metadata = compute_rollout_rewards(reward_fn, rollout_responses, repeated_ground_truths)
     advantages, group_rewards_metadata = compute_group_normalized_rewards(raw_rewards, group_size, baseline, advantage_eps, advantage_normalizer)
+    # save some data before pruning
+    samples = {
+        "sample_prompt": repeated_prompts[0],
+        "sample_rollout": rollout_responses[0],
+    }
     # prune advantage == 0
     adv_nonzero_idxs = advantages.nonzero(as_tuple=True)[0].tolist()
     repeated_prompts = [repeated_prompts[i] for i in adv_nonzero_idxs]
@@ -204,20 +209,11 @@ def grpo_train_step(
     grad_norm = clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
     optimizer.zero_grad()
-    if metadatas:
-        return batch_loss, {
-            "sample_prompt": repeated_prompts[0],
-            "sample_rollout": rollout_responses[0],
-            "grad_norm": grad_norm.item(),
-            "mean_token_entropy": sum(m["mean_token_entropy"] for m in metadatas) / len(metadatas),
-            "mean_reward": rewards_metadata["mean_reward"],
-            "mean_format_reward": rewards_metadata["mean_format_reward"],
-        }
     return batch_loss, {
-        "sample_prompt": None,
-        "sample_rollout": None,
+        "sample_prompt": samples["sample_prompt"],
+        "sample_rollout": samples["sample_rollout"],
         "grad_norm": grad_norm.item(),
-        "mean_token_entropy": None,
-        "mean_reward": None,
-        "mean_format_reward": None,
+        "mean_token_entropy": sum(m["mean_token_entropy"] for m in metadatas) / len(metadatas) if metadatas else None,
+        "mean_reward": rewards_metadata["mean_reward"],
+        "mean_format_reward": rewards_metadata["mean_format_reward"],
     }
