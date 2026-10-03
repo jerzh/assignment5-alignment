@@ -215,7 +215,7 @@ def grpo_train_step(
         batch_loss += loss.detach()
         metadatas.append(loss_metadata | {
             # Only consider token entropy over response tokens
-            "mean_token_entropy": (log_probs_dict["token_entropy"] * tokenized["response_mask"]).sum().item() / tokenized["response_mask"].sum().item(),
+            "token_entropy": (log_probs_dict["token_entropy"] * tokenized["response_mask"]).sum().item() / tokenized["response_mask"].sum().item(),
         })
     grad_norm = clip_grad_norm_(model.parameters(), max_grad_norm)
     optimizer.step()
