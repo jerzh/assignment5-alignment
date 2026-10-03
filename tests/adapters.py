@@ -47,7 +47,7 @@ def run_tokenize_prompt_and_output(
                 with labels, with value 1 where the corresponding label token
                 is part of the response and 0 otherwise.
     """
-    return tokenize_prompt_and_output(prompt_strs, output_strs, tokenizer)
+    return tokenize_prompt_and_output(prompt_strs, output_strs, tokenizer, device="cpu")
 
 
 def run_get_response_log_probs(

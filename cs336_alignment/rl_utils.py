@@ -126,7 +126,7 @@ def compute_policy_gradient_loss(
             adv * torch.clip(token_weight, 1-cliprange, 1+cliprange),
         )
     elif importance_reweighting_method == "gspo":
-        gspo_weight = torch.exp(torch.sum((policy_log_probs - old_log_probs) * response_mask, dim=1) / response_mask.sum(dim=1)).unsqueeze(1)
+        gspo_weight = torch.exp(torch.sum((policy_log_probs - old_log_probs) * response_mask, dim=1) / response_mask.sum(dim=1)).unsqueeze(1).expand(policy_log_probs.shape)
         per_token_policy_gradient_loss = -torch.min(
             adv * gspo_weight,
             adv * torch.clip(gspo_weight, 1-cliprange, 1+cliprange),
