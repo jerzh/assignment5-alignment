@@ -18,6 +18,7 @@ def parse_args() -> argparse.Namespace:
     # ---- benchmark parameters ----
     p.add_argument("--n-examples", type=int, default=10)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--gpu-id", type=int, default=0)
 
     # ---- logging parameters ----
     p.add_argument("--rollout-display-len", type=int, default=200)
@@ -38,7 +39,7 @@ if __name__ == "__main__":
     server = VLLMServer(
         model_id="allenai/OLMo-2-0425-1B",
         seed=args.seed,
-        gpu=1,
+        gpu=args.gpu_id,
     )
     server.start()
     server.init_weight_sync("cuda:0")
@@ -74,6 +75,7 @@ if __name__ == "__main__":
         )]
         reward_total = collections.Counter()
         for qa_pair, rollout in zip(test_data, rollouts):
+            logging.info(f"prompt: {qa_pair['question']}")
             answer = qa_pair["answer"].split("####")[1].strip()
             if len(rollout) <= args.rollout_display_len:
                 logging.info(f"rollout: {rollout}")
