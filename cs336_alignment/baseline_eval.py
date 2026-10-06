@@ -42,7 +42,6 @@ if __name__ == "__main__":
         gpu=args.gpu_id,
     )
     server.start()
-    server.init_weight_sync("cuda:0")
 
     for mode in ["question_only", "r1_zero", "r1_zero_three_shot"]:
         logging.info(f"begin eval for mode: {mode}")
